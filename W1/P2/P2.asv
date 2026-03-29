@@ -1,0 +1,97 @@
+clc; clear global; close all;
+%% ========================================================
+%  第二题：算法 2.5.1 估计矩阵1范数（优化法）及误差分析图表
+% =========================================================
+
+fprintf('==========================================\n');
+fprintf('  第二题：1范数估计（算法2.5.1）\n');
+fprintf('==========================================\n\n');
+
+%% --- 第(1)小题：估计5到20阶Hilbert矩阵的∞范数条件数 ---
+fprintf('--- 第(1)小题：Hilbert矩阵的∞范数条件数 ---\n');
+fprintf('%6s %18s %18s %12s\n', '阶数n', '估计条件数(∞)', '精确条件数(∞)', '相对误差');
+fprintf('%s\n', repmat('-', 1, 60));
+
+for n = 5:20
+    H = hilb(n);
+    H_inv = invhilb(n);  
+    
+    % 注意：如果你的 norm1_est_251 被修改为返回两个值（见下文），
+    % 这里只需接收第一个返回值即可。
+    norm_H_inf_est   = norm1_est_251(H');
+    norm_Hinv_inf_est = norm1_est_251(H_inv');
+
+    cond_est  = norm_H_inf_est * norm_Hinv_inf_est;
+    cond_exact = cond(H, inf);
+    rel_err   = abs(cond_est - cond_exact) / cond_exact;
+
+    fprintf('%6d %18.4e %18.4e %12.4e\n', n, cond_est, cond_exact, rel_err);
+end
+fprintf('\n');
+
+%% --- 绘图 1：1范数随着迭代步的变化曲线 ---
+% 我们以 n=20 的 Hilbert 矩阵为例，来观察迭代过程
+H20 = hilb(20);
+[~, norm_history] = norm1_est_251(H20'); % 获取迭代历史数组
+
+figure('Name', '1范数迭代变化图', 'Color', 'w');
+plot(1:length(norm_history), norm_history, '-o', 'LineWidth', 2, 'MarkerSize', 8, 'MarkerFaceColor', '#0072BD');
+xlabel('迭代步数 (Iteration Steps)', 'FontSize', 12, 'FontWeight', 'bold');
+ylabel('1范数估计值', 'FontSize', 12, 'FontWeight', 'bold');
+title('优化法(算法2.5.1)估计1范数随迭代步的变化 (Hilbert, n=20)', 'FontSize', 14);
+grid on;
+ax = gca; ax.GridLineStyle = '--';
+
+
+%% --- 第(2)小题：An矩阵，估计计算解的精度 ---
+fprintf('--- 第(2)小题：An矩阵 n从5到30 精度估计 ---\n');
+fprintf('%6s %15s %15s %15s %15s\n', 'n', '真实误差', '估计误差上界', '真实残差', '估计/真实');
+fprintf('%s\n', repmat('-', 1, 75));
+
+% 初始化用于绘图的数组
+n_vec = 5:30;
+true_err_vec = zeros(length(n_vec), 1);
+err_bound_vec = zeros(length(n_vec), 1);
+
+for i = 1:length(n_vec)
+    n = n_vec(i);
+    An = build_An(n); % 请确保此函数存在
+
+    rng(n);  
+    x_true = randn(n, 1);
+    b = An * x_true;
+
+    x_hat = gauss_col_pivot(An, b); % 请确保此函数存在
+
+    % 计算并保存真实相对误差
+    true_err = norm(x_hat - x_true, inf) / norm(x_true, inf);
+    true_err_vec(i) = true_err;
+
+    % 估计范数
+    norm_An_1   = norm1_est_251(An);
+    norm_Aninv_1  = norm1_est_251(inv(An)); 
+    cond_est_1 = norm_An_1 * norm_Aninv_1;
+
+    r = b - An * x_hat;
+    res = norm(r, inf) / norm(b, inf);
+
+    % 计算并保存误差上界
+    err_bound = cond_est_1 * res;
+    err_bound_vec(i) = err_bound;
+
+    fprintf('%6d %15.4e %15.4e %15.4e %15.4e\n', n, true_err, err_bound, res, err_bound/max(true_err,1e-300));
+end
+fprintf('\n');
+
+%% --- 绘图 2：估计计算解和实际相对误差的图 ---
+figure('Name', '误差对比图', 'Color', 'w');
+% 使用 semilogy 画对数图，因为误差通常跨越好几个数量级
+semilogy(n_vec, true_err_vec, 'b-o', 'LineWidth', 1.5, 'MarkerFaceColor', 'b');
+hold on;
+semilogy(n_vec, err_bound_vec, 'r-s', 'LineWidth', 1.5, 'MarkerFaceColor', 'r');
+xlabel('矩阵阶数 n', 'FontSize', 12, 'FontWeight', 'bold');
+ylabel('相对误差 (对数坐标)', 'FontSize', 12, 'FontWeight', 'bold');
+title('真实相对误差与估计误差上界对比图', 'FontSize', 14);
+legend('真实相对误差', '估计误差上界', 'Location', 'best', 'FontSize', 11);
+grid on;
+ax = gca; ax.GridLineStyle = '--';
